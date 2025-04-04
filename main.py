@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 # coding: utf-8
 
@@ -11,17 +10,14 @@ from urllib.parse import urlparse, parse_qs
 import urllib.parse
 import os
 
-# Initialize the bot with your token from the environment variable
 bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
 bot = telebot.TeleBot(bot_token)
 
-# Initialize the AliExpress API with your credentials from environment variables
 app_key = os.getenv('ALIEXPRESS_APP_KEY')
 app_secret = os.getenv('ALIEXPRESS_APP_SECRET')
 aliexpress = AliexpressApi(app_key, app_secret,
                            models.Language.EN, models.Currency.EUR, 'default')
 
-# Define the keyboards
 keyboardStart = types.InlineKeyboardMarkup(row_width=1)
 btn1 = types.InlineKeyboardButton("⭐️ألعاب لجمع العملات المعدنية⭐️", callback_data="games")
 btn2 = types.InlineKeyboardButton("⭐️تخفيض العملات على منتجات السلة 🛒⭐️", callback_data='click')
@@ -34,7 +30,6 @@ keyboard.add(btn1, btn2, btn3)
 keyboard_games = types.InlineKeyboardMarkup(row_width=1)
 keyboard_games.add(btn1, btn2, btn3)
 
-# Welcome message handler
 @bot.message_handler(commands=['start'])
 def welcome_user(message):
     bot.send_message(
@@ -43,7 +38,6 @@ def welcome_user(message):
         reply_markup=keyboardStart
     )
 
-# Callback handler for 'click' button
 @bot.callback_query_handler(func=lambda call: call.data == 'click')
 def button_click(callback_query):
     bot.edit_message_text(chat_id=callback_query.message.chat.id,
@@ -56,7 +50,6 @@ def button_click(callback_query):
                    caption="",
                    reply_markup=keyboard)
 
-# Function to get affiliate links and product details
 def get_affiliate_links(message, message_id, link):
     try:
         affiliate_link = aliexpress.get_affiliate_links(
@@ -105,7 +98,6 @@ def get_affiliate_links(message, message_id, link):
     except Exception as e:
         bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
 
-# Function to extract links from text
 def extract_link(text):
     link_pattern = r'https?://\S+|www\.\S+'
     links = re.findall(link_pattern, text)
@@ -113,7 +105,6 @@ def extract_link(text):
         return links[0]
     return None
 
-# Function to build shopcart link
 def build_shopcart_link(link):
     params = get_url_params(link)
     shop_cart_link = "https://www.aliexpress.com/p/trade/confirm.html?"
@@ -123,17 +114,14 @@ def build_shopcart_link(link):
     }
     return create_query_string_url(link=shop_cart_link, params=shop_cart_params)
 
-# Function to parse URL parameters
 def get_url_params(link):
     parsed_url = urlparse(link)
     params = parse_qs(parsed_url.query)
     return params
 
-# Function to create a URL with query string
 def create_query_string_url(link, params):
     return link + urllib.parse.urlencode(params)
 
-# Function to get shopcart affiliate link
 def get_affiliate_shopcart_link(link, message):
     try:
         shopcart_link = build_shopcart_link(link)
@@ -146,7 +134,6 @@ def get_affiliate_shopcart_link(link, message):
     except:
         bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
 
-# Message handler for all text messages
 @bot.message_handler(func=lambda message: True)
 def get_link(message):
     link = extract_link(message.text)
@@ -166,7 +153,6 @@ def get_link(message):
                          "قم بإرسال <b> الرابط فقط</b> بدون عنوان المنتج",
                          parse_mode='HTML')
 
-# Callback handler for any callback query
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback_query(call):
     bot.send_message(call.message.chat.id, "..")
@@ -179,5 +165,19 @@ def handle_callback_query(call):
                 "قم بالدخول يوميا لها للحصول على أكبر عدد ممكن في اليوم 👇",
         reply_markup=keyboard_games)
 
-# Keep the bot alive
+from flask import Flask
+import threading
+
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def index():
+    return 'Telegram bot is running!'
+
+def run_flask():
+    port = int(os.environ.get('PORT', 5000))
+    flask_app.run(host='0.0.0.0', port=port)
+
+threading.Thread(target=run_flask).start()
+
 bot.infinity_polling(timeout=10, long_polling_timeout=5)
