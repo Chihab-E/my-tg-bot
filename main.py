@@ -99,7 +99,7 @@ def get_affiliate_links(message, message_id, link):
                                f"💰 عرض العملات (السعر النهائي عند الدفع)  : \nالرابط {affiliate_link} \n"
                                f"💎 عرض السوبر  : \nالرابط {super_links} \n"
                                f"♨️ عرض محدود  : \nالرابط {limit_links} \n\n"
-                               "La Deals !",
+                               "t.me/tcoupon !",
                         reply_markup=keyboard
                     )
                     return
