@@ -16,9 +16,9 @@ aliexpress = AliexpressApi(app_key, app_secret,
                            models.Language.EN, models.Currency.EUR, 'default')
 
 keyboardStart = types.InlineKeyboardMarkup(row_width=1)
-btn1 = types.InlineKeyboardButton("⭐️ألعاب لجمع العملات المعدنية⭐️", callback_data="games")
-btn2 = types.InlineKeyboardButton("⭐️تخفيض العملات على منتجات السلة 🛒⭐️", callback_data='click')
-btn3 = types.InlineKeyboardButton("❤️ اشترك في القناة للمزيد من العروض ❤️", url="t.me/Tcoupon")
+btn1 = types.InlineKeyboardButton("\u2b50\ufe0f\u0623\u0644\u0639\u0627\u0628 \u0644\u062c\u0645\u0639 \u0627\u0644\u0639\u0645\u0644\u0627\u062a \u0627\u0644\u0645\u0639\u062f\u0646\u064a\u0629\u2b50\ufe0f", callback_data="games")
+btn2 = types.InlineKeyboardButton("\u2b50\ufe0f\u062a\u062e\u0641\u064a\u0636 \u0627\u0644\u0639\u0645\u0644\u0627\u062a \u0639\u0644\u0649 \u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0633\u0644\u0629 \ud83d\ude96\u2b50\ufe0f", callback_data='click')
+btn3 = types.InlineKeyboardButton("\u2764\ufe0f \u0627\u0634\u062a\u0631\u0643 \u0641\u064a \u0627\u0644\u0642\u0646\u0627\u0629 \u0644\u0644\u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u0639\u0631\u0648\u0636 \u2764\ufe0f", url="t.me/Tcoupon")
 keyboardStart.add(btn1, btn2, btn3)
 
 keyboard = types.InlineKeyboardMarkup(row_width=1)
@@ -27,11 +27,21 @@ keyboard.add(btn1, btn2, btn3)
 keyboard_games = types.InlineKeyboardMarkup(row_width=1)
 keyboard_games.add(btn1, btn2, btn3)
 
+def extract_product_id(link):
+    match = re.search(r'/item/(\d+)\.html', link)
+    if match:
+        return match.group(1)
+    parsed = urlparse(link)
+    qs = parse_qs(parsed.query)
+    if 'productId' in qs:
+        return qs['productId'][0]
+    return None
+
 @bot.message_handler(commands=['start'])
 def welcome_user(message):
     bot.send_message(
         message.chat.id,
-        "مرحبا بك، ارسل لنا رابط المنتج الذي تريد شرائه لنوفر لك افضل سعر له 👌 \n",
+        "\u0645\u0631\u062d\u0628\u0627 \u0628\u0643\u060c \u0627\u0631\u0633\u0644 \u0644\u0646\u0627 \u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u0646\u062a\u062c \u0627\u0644\u0630\u064a \u062a\u0631\u064a\u062f \u0634\u0631\u0627\u0626\u0647 \u0644\u0646\u0648\u0641\u0631 \u0644\u0643 \u0627\u0641\u0636\u0644 \u0633\u0639\u0631 \u0644\u0647 \ud83d\udc4c \n",
         reply_markup=keyboardStart
     )
 
@@ -61,39 +71,40 @@ def get_affiliate_links(message, message_id, link):
             f'https://star.aliexpress.com/share/share.htm?platform=AE&businessType=ProductDetail&redirectUrl={link}?sourceType=561&aff_fcid='
         )[0].promotion_link
 
-        try:
-            product_details = aliexpress.get_products_details([
-                '1000006468625',
-                f'https://star.aliexpress.com/share/share.htm?platform=AE&businessType=ProductDetail&redirectUrl={link}'
-            ])
-            price_pro = product_details[0].target_sale_price
-            title_link = product_details[0].product_title
-            img_link = product_details[0].product_main_image_url
+        product_id = extract_product_id(link)
 
-            bot.delete_message(message.chat.id, message_id)
-            bot.send_photo(message.chat.id,
-                           img_link,
-                           caption=f" \n🛒 منتجك هو  : 🔥 \n{title_link} 🛍 \n"
-                                   f"سعر المنتج  : {price_pro} دولار 💵\n"
-                                   " \n قارن بين الاسعار واشتري 🔥 \n"
-                                   f"💰 عرض العملات (السعر النهائي عند الدفع)  : \nالرابط {affiliate_link} \n"
-                                   f"💎 عرض السوبر  : \nالرابط {super_links} \n"
-                                   f"♨️ عرض محدود  : \nالرابط {limit_links} \n\n"
-                                   "T.me/Tcoupon !",
-                           reply_markup=keyboard)
+        if product_id:
+            product_details = aliexpress.get_products_details([product_id])
+            if product_details:
+                price_pro = product_details[0].target_sale_price
+                title_link = product_details[0].product_title
+                img_link = product_details[0].product_main_image_url
 
-        except:
-            bot.delete_message(message.chat.id, message_id)
-            bot.send_message(message.chat.id, 
-                             "قارن بين الاسعار واشتري 🔥 \n"
-                             f"💰 عرض العملات (السعر النهائي عند الدفع) : \nالرابط {affiliate_link} \n"
-                             f"💎 عرض السوبر : \nالرابط {super_links} \n"
-                             f"♨️ عرض محدود : \nالرابط {limit_links} \n\n"
-                             ,
-                             reply_markup=keyboard)
+                bot.delete_message(message.chat.id, message_id)
+                bot.send_photo(message.chat.id,
+                               img_link,
+                               caption=f" \n\ud83d\uded2 \u0645\u0646\u062a\u062c\u0643 \u0647\u0648  : \ud83d\udd25 \n{title_link} \ud83c\udf6d \n"
+                                       f"\u0633\u0639\u0631 \u0627\u0644\u0645\u0646\u062a\u062c  : {price_pro} \u062f\u0648\u0644\u0627\u0631 \ud83d\udcb5\n"
+                                       " \n \u0642\u0627\u0631\u0646 \u0628\u064a\u0646 \u0627\u0644\u0627\u0633\u0639\u0627\u0631 \u0648\u0627\u0634\u062a\u0631\u064a \ud83d\udd25 \n"
+                                       f"\ud83d\udcb0 \u0639\u0631\u0636 \u0627\u0644\u0639\u0645\u0644\u0627\u062a (\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0646\u0647\u0627\u0626\u064a \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639)  : \n\u0627\u0644\u0631\u0627\u0628\u0637 {affiliate_link} \n"
+                                       f"\ud83d\udc8e \u0639\u0631\u0636 \u0627\u0644\u0633\u0648\u0628\u0631  : \n\u0627\u0644\u0631\u0627\u0628\u0637 {super_links} \n"
+                                       f"\u2668\ufe0f \u0639\u0631\u0636 \u0645\u062d\u062f\u0648\u062f  : \n\u0627\u0644\u0631\u0627\u0628\u0637 {limit_links} \n\n"
+                                       "La Deals !",
+                               reply_markup=keyboard)
+                return
+
+        bot.delete_message(message.chat.id, message_id)
+        bot.send_message(message.chat.id,
+                         "\u0642\u0627\u0631\u0646 \u0628\u064a\u0646 \u0627\u0644\u0627\u0633\u0639\u0627\u0631 \u0648\u0627\u0634\u062a\u0631\u064a \ud83d\udd25 \n"
+                         f"\ud83d\udcb0 \u0639\u0631\u0636 \u0627\u0644\u0639\u0645\u0644\u0627\u062a (\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0646\u0647\u0627\u0626\u064a \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639) : \n\u0627\u0644\u0631\u0627\u0628\u0637 {affiliate_link} \n"
+                         f"\ud83d\udc8e \u0639\u0631\u0636 \u0627\u0644\u0633\u0648\u0628\u0631 : \n\u0627\u0644\u0631\u0627\u0628\u0637 {super_links} \n"
+                         f"\u2668\ufe0f \u0639\u0631\u0636 \u0645\u062d\u062f\u0648\u062f : \n\u0627\u0644\u0631\u0627\u0628\u0637 {limit_links} \n\n",
+                         reply_markup=keyboard)
 
     except Exception as e:
-        bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
+        bot.delete_message(message.chat.id, message_id)
+        bot.send_message(message.chat.id, "\u062d\u062f\u062b \u062e\u0637\u0623 \ud83e\udd37\u200d\u2642\ufe0f")
+        print(f"Error: {e}")
 
 def extract_link(text):
     link_pattern = r'https?://\S+|www\.\S+'
@@ -106,7 +117,7 @@ def build_shopcart_link(link):
     params = get_url_params(link)
     shop_cart_link = "https://www.aliexpress.com/p/trade/confirm.html?"
     shop_cart_params = {
-        "availableProductShopcartIds": ",".join(params["availableProductShopcartIds"]),
+        "availableProductShopcartIds": ",".join(params.get("availableProductShopcartIds", [])),
         "extraParams": json.dumps({"channelInfo": {"sourceType": "620"}}, separators=(',', ':'))
     }
     return create_query_string_url(link=shop_cart_link, params=shop_cart_params)
@@ -124,18 +135,18 @@ def get_affiliate_shopcart_link(link, message):
         shopcart_link = build_shopcart_link(link)
         affiliate_link = aliexpress.get_affiliate_links(shopcart_link)[0].promotion_link
 
-        text2 = f"هذا رابط تخفيض السلة \n{str(affiliate_link)}"
+        text2 = f"\u0647\u0630\u0627 \u0631\u0627\u0628\u0637 \u062a\u062e\u0641\u064a\u0636 \u0627\u0644\u0633\u0644\u0629 \n{str(affiliate_link)}"
         img_link3 = "https://i.postimg.cc/HkMxWS1T/photo-5893070682508606111-y.jpg"
         bot.send_photo(message.chat.id, img_link3, caption=text2)
 
     except:
-        bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
+        bot.send_message(message.chat.id, "\u062d\u062f\u062b \u062e\u0637\u0623 \ud83e\udd37\u200d\u2642\ufe0f")
 
 @bot.message_handler(func=lambda message: True)
 def get_link(message):
     link = extract_link(message.text)
 
-    sent_message = bot.send_message(message.chat.id, 'المرجو الانتظار قليلا، يتم تجهيز العروض ⏳')
+    sent_message = bot.send_message(message.chat.id, '\u0627\u0644\u0645\u0631\u062c\u0648 \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631 \u0642\u0644\u064a\u0644\u0627\u060c \u064a\u062a\u0645 \u062a\u062c\u0647\u064a\u0632 \u0627\u0644\u0639\u0631\u0648\u0636 \u23f3')
     message_id = sent_message.message_id
 
     if link and "aliexpress.com" in link and not ("p/shoppingcart" in message.text.lower()):
@@ -146,8 +157,7 @@ def get_link(message):
     else:
         bot.delete_message(message.chat.id, message_id)
         bot.send_message(message.chat.id,
-                         "الرابط غير صحيح ! تأكد من رابط المنتج أو اعد المحاولة.\n"
-                         "قم بإرسال <b> الرابط فقط</b> بدون عنوان المنتج",
+                         "\u0627\u0644\u0631\u0627\u0628\u0637 \u063a\u064a\u0631 \u0635\u062d\u064a\u062d ! \u062a\u0623\u0643\u062f \u0645\u0646 \u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u0646\u062a\u062c \u0623\u0648 \u0627\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.\n\u0642\u0645 \u0628\u0625\u0631\u0633\u0627\u0644 <b> \u0627\u0644\u0631\u0627\u0628\u0637 \u0641\u0642\u0637</b> \u0628\u062f\u0648\u0646 \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0646\u062a\u062c",
                          parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -158,8 +168,5 @@ def handle_callback_query(call):
     bot.send_photo(
         call.message.chat.id,
         img_link2,
-        caption="روابط ألعاب جمع العملات المعدنية لإستعمالها في خفض السعر لبعض المنتجات، "
-                "قم بالدخول يوميا لها للحصول على أكبر عدد ممكن في اليوم 👇",
-        reply_markup=keyboard_games)
+        caption="\u0631\u0648\u0627\u0628\u0637 \u0623\u0644\u0639\u0627\u0628 \u062c\u0645\u0639 \u0627\u0644\u0639\u0645\u0644\u0627\u062a \u0627\u0644\u0645\u0639\u062f\u0646\u064a\u0629 \u0644\u0625\u0633\u062a\u0639\u0645\u0627\u0644\u0647\u0627 \u0641\u064a \u062e\u0641\u0636 \u0627\u0644\u0633\u0639\u0631 \u0644\u0628\u0639\u0636 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a\u060c \n\u0642\u0645 \u0628\u0627\u0644\u062f\u062e\u0648\u0644 \u064a\u0648\u0645\u064a\u0627 \u0644\u0647\u0627 \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0623\u0643\u0628
 
-bot.infinity_polling(timeout=10, long_polling_timeout=5)
