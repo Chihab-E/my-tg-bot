@@ -3,10 +3,10 @@ from telebot import types
 from aliexpress_api import AliexpressApi, models
 import re
 import requests
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, parse_qs
 import os
 
-# Initialize bot with faster timeout
+# Initialize bot
 bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
 bot = telebot.TeleBot(bot_token, parse_mode='HTML')
 
@@ -15,70 +15,70 @@ app_key = os.getenv('ALIEXPRESS_APP_KEY')
 app_secret = os.getenv('ALIEXPRESS_APP_SECRET')
 aliexpress = AliexpressApi(app_key, app_secret, models.Language.FR, models.Currency.EUR, 'default')
 
-# ===== IMPROVED URL HANDLING =====
-def expand_short_link(url):
-    """Follows all redirects for shortened links with retries"""
+# ===== ULTIMATE URL CLEANER =====
+def clean_aliexpress_url(url):
+    """Converts any AliExpress URL to clean fr.aliexpress.com format"""
     try:
-        session = requests.Session()
-        session.max_redirects = 5
-        resp = session.head(url, allow_redirects=True, timeout=10)
-        return resp.url
-    except:
-        return url
-
-def extract_clean_url(text):
-    """Extracts and cleans any AliExpress URL format"""
-    # Find first URL in message
-    url_match = re.search(r'https?://[^\s]+', text)
-    if not url_match:
-        return None
-    
-    url = url_match.group()
-    
-    # Expand shortened links
-    if 's.click.aliexpress.com' in url:
-        url = expand_short_link(url)
-    
-    # Parse URL components
-    parsed = urlparse(url)
-    
-    # Force French domain
-    domain = parsed.netloc.replace('www.', '').replace('aliexpress.com', 'fr.aliexpress.com')
-    
-    # Extract product ID from various URL formats
-    product_id = None
-    path_parts = parsed.path.split('/')
-    
-    # Standard format: /item/100500123.html
-    if len(path_parts) >= 3 and path_parts[1] == 'item':
-        product_id = path_parts[2].split('.')[0]
-    
-    # Alternative format: /i/100500123.html
-    elif len(path_parts) >= 3 and path_parts[1] == 'i':
-        product_id = path_parts[2].split('.')[0]
-    
-    # Build clean French URL
-    if product_id and product_id.isdigit():
-        return f'https://{domain}/item/{product_id}.html'
+        # Follow redirects for shortened links
+        if 's.click.aliexpress.com' in url:
+            try:
+                session = requests.Session()
+                session.max_redirects = 5
+                resp = session.head(url, allow_redirects=True, timeout=10)
+                url = resp.url
+            except:
+                pass
+        
+        # Parse URL components
+        parsed = urlparse(url)
+        
+        # Convert any country domain to French (vi., es., de. → fr.)
+        domain_parts = parsed.netloc.split('.')
+        if len(domain_parts) > 1 and domain_parts[0] in ['vi', 'es', 'de', 'it', 'ru']:
+            domain_parts[0] = 'fr'
+        
+        # Rebuild domain (ensure it's fr.aliexpress.com)
+        new_domain = '.'.join(domain_parts).replace('www.', '').replace('aliexpress.com', 'fr.aliexpress.com')
+        
+        # Extract product ID from various URL formats
+        product_id = None
+        path_parts = [p for p in parsed.path.split('/') if p]
+        
+        # Standard formats: /item/100500123.html or /i/100500123.html
+        if len(path_parts) >= 2 and path_parts[-2] in ['item', 'i']:
+            product_id = path_parts[-1].split('.')[0]
+        
+        # Verify we have a valid product ID
+        if product_id and product_id.isdigit() and len(product_id) >= 9:
+            return f'https://{new_domain}/item/{product_id}.html'
+        
+    except Exception as e:
+        print(f"URL cleaning error: {e}")
     
     return None
 
 # ===== BOT HANDLERS =====
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "🚀 أرسل رابط منتج AliExpress للحصول على أفضل العروض!")
+    bot.reply_to(message, "🛍️ أرسل رابط منتج AliExpress للحصول على أفضل العروض!")
 
 @bot.message_handler(func=lambda m: True)
 def handle_product_link(message):
-    clean_url = extract_clean_url(message.text)
+    # Extract and clean URL
+    url_match = re.search(r'https?://[^\s]+', message.text)
+    if not url_match:
+        bot.reply_to(message, "❌ الرابط غير صالح. يرجى إرسال رابط منتج AliExpress مباشر.")
+        return
+    
+    clean_url = clean_aliexpress_url(url_match.group())
     
     if not clean_url:
-        bot.reply_to(message, "❌ لم أتمكن من تحديد رابط منتج صالح. يرجى إرسال رابط مباشر.")
+        bot.reply_to(message, "❌ لم أتمكن من تحويل الرابط إلى صيغة صالحة. يرجى المحاولة برابط آخر.")
         return
     
     try:
         # Show loading message
-        msg = bot.reply_to(message, "🔍 جاري البحث عن أفضل العروض...")
+        msg = bot.reply_to(message, "🔍 جاري معالجة الرابط...")
         
         # Extract product ID
         product_id = re.search(r'/item/(\d+)\.html', clean_url).group(1)
@@ -89,19 +89,19 @@ def handle_product_link(message):
         # Generate affiliate links
         base_link = f"https://fr.aliexpress.com/item/{product_id}.html"
         
-        affiliate_links = [
-            aliexpress.get_affiliate_links(f"{base_link}?sourceType=620")[0].promotion_link,
-            aliexpress.get_affiliate_links(f"{base_link}?sourceType=562")[0].promotion_link,
-            aliexpress.get_affiliate_links(f"{base_link}?sourceType=561")[0].promotion_link
-        ]
+        affiliate_links = {
+            'standard': aliexpress.get_affiliate_links(f"{base_link}?sourceType=620")[0].promotion_link,
+            'super': aliexpress.get_affiliate_links(f"{base_link}?sourceType=562")[0].promotion_link,
+            'limited': aliexpress.get_affiliate_links(f"{base_link}?sourceType=561")[0].promotion_link
+        }
         
         # Prepare response
         caption = (
             f"<b>{details.product_title}</b>\n\n"
             f"💰 السعر: {details.target_sale_price} EUR\n\n"
-            f"🔗 <a href='{affiliate_links[0]}'>رابط الشراء الأساسي</a>\n"
-            f"🔥 <a href='{affiliate_links[1]}'>عرض السوبر</a>\n"
-            f"⚡ <a href='{affiliate_links[2]}'>عرض محدود</a>"
+            f"🔗 <a href='{affiliate_links['standard']}'>رابط الشراء الأساسي</a>\n"
+            f"🔥 <a href='{affiliate_links['super']}'>عرض السوبر</a>\n"
+            f"⚡ <a href='{affiliate_links['limited']}'>عرض محدود</a>"
         )
         
         # Send results
@@ -111,19 +111,19 @@ def handle_product_link(message):
             details.product_main_image_url,
             caption=caption,
             reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🛒 شراء الآن", url=affiliate_links[0])
+                types.InlineKeyboardButton("🛒 شراء الآن", url=affiliate_links['standard'])
             )
         )
         
     except IndexError:
-        bot.reply_to(message, "⚠️ المنتج غير متوفر في المتجر الفرنسي (الرجاء التأكد من الرابط)")
+        bot.reply_to(message, "⚠️ المنتج غير متوفر في المتجر الفرنسي")
     except Exception as e:
-        bot.reply_to(message, f"❌ حدث خطأ: {str(e)}")
+        bot.reply_to(message, f"❌ خطأ: {str(e)}")
 
 # Start bot with error handling
 while True:
     try:
         bot.infinity_polling()
     except Exception as e:
-        print(f"Bot crashed: {e}")
+        print(f"Bot error: {e}")
         continue
