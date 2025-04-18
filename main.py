@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
 
 import telebot
 from telebot import types
@@ -52,6 +50,11 @@ def button_click(callback_query):
 
 def get_affiliate_links(message, message_id, link):
     try:
+        # Normalize the URL to French version if no locale specified
+        parsed = urlparse(link)
+        if "aliexpress.com" in parsed.netloc and not parsed.netloc.startswith("fr."):
+            link = f"https://fr.aliexpress.com{parsed.path}?{parsed.query}" if parsed.query else f"https://fr.aliexpress.com{parsed.path}"
+
         affiliate_link = aliexpress.get_affiliate_links(
             f'https://star.aliexpress.com/share/share.htm?platform=AE&businessType=ProductDetail&redirectUrl={link}?sourceType=620&aff_fcid='
         )[0].promotion_link
@@ -66,7 +69,7 @@ def get_affiliate_links(message, message_id, link):
 
         try:
             product_details = aliexpress.get_products_details([
-                '1000006468625',
+                '1000006468625',  # Remove this hardcoded ID?
                 f'https://star.aliexpress.com/share/share.htm?platform=AE&businessType=ProductDetail&redirectUrl={link}'
             ])
             price_pro = product_details[0].target_sale_price
@@ -82,20 +85,21 @@ def get_affiliate_links(message, message_id, link):
                                    f"💰 عرض العملات (السعر النهائي عند الدفع)  : \nالرابط {affiliate_link} \n"
                                    f"💎 عرض السوبر  : \nالرابط {super_links} \n"
                                    f"♨️ عرض محدود  : \nالرابط {limit_links} \n\n"
-                                   "La Deals !",
+                                   "t.me/Tcoupon !",
                            reply_markup=keyboard)
 
-        except:
+        except Exception as e:
+            print(f"Error getting product details: {e}")
             bot.delete_message(message.chat.id, message_id)
             bot.send_message(message.chat.id, 
                              "قارن بين الاسعار واشتري 🔥 \n"
                              f"💰 عرض العملات (السعر النهائي عند الدفع) : \nالرابط {affiliate_link} \n"
                              f"💎 عرض السوبر : \nالرابط {super_links} \n"
-                             f"♨️ عرض محدود : \nالرابط {limit_links} \n\n"
-                             ,
+                             f"♨️ عرض محدود : \nالرابط {limit_links} \n\n",
                              reply_markup=keyboard)
 
     except Exception as e:
+        print(f"Error in get_affiliate_links: {e}")
         bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
 
 def extract_link(text):
@@ -164,20 +168,5 @@ def handle_callback_query(call):
         caption="روابط ألعاب جمع العملات المعدنية لإستعمالها في خفض السعر لبعض المنتجات، "
                 "قم بالدخول يوميا لها للحصول على أكبر عدد ممكن في اليوم 👇",
         reply_markup=keyboard_games)
-
-from flask import Flask
-import threading
-
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def index():
-    return 'Telegram bot is running!'
-
-def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    flask_app.run(host='0.0.0.0', port=port)
-
-threading.Thread(target=run_flask).start()
 
 bot.infinity_polling(timeout=10, long_polling_timeout=5)
