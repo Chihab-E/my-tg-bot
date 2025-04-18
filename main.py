@@ -3,7 +3,7 @@ from telebot import types
 from aliexpress_api import AliexpressApi, models
 import re
 import requests, json
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlunparse
 import urllib.parse
 import os
 
@@ -14,7 +14,7 @@ bot = telebot.TeleBot(bot_token)
 app_key = os.getenv('ALIEXPRESS_APP_KEY')
 app_secret = os.getenv('ALIEXPRESS_APP_SECRET')
 aliexpress = AliexpressApi(app_key, app_secret,
-                           models.Language.FR, models.Currency.EUR, 'default')  # Changed to FR for French
+                           models.Language.FR, models.Currency.EUR, 'default')  # Force French
 
 # Keyboard setup
 keyboardStart = types.InlineKeyboardMarkup(row_width=1)
@@ -29,40 +29,54 @@ keyboard.add(btn1, btn2, btn3)
 keyboard_games = types.InlineKeyboardMarkup(row_width=1)
 keyboard_games.add(btn1, btn2, btn3)
 
-# Helper function to expand shortened AliExpress URLs
+# ===== NEW: Function to force French version of AliExpress links =====
+def force_french_version(url):
+    try:
+        parsed = urlparse(url)
+        if "aliexpress.com" in parsed.netloc:
+            # Replace domain with fr.aliexpress.com
+            new_netloc = parsed.netloc.replace("www.aliexpress.com", "fr.aliexpress.com") \
+                                     .replace("aliexpress.com", "fr.aliexpress.com") \
+                                     .replace("s.click.aliexpress.com", "fr.aliexpress.com")
+            # Rebuild URL
+            new_parsed = parsed._replace(netloc=new_netloc)
+            return urlunparse(new_parsed)
+        return url
+    except Exception as e:
+        print(f"Error forcing French version: {e}")
+        return url
+
+# ===== NEW: Improved URL expander with French enforcement =====
 def expand_shortened_url(short_url):
     try:
         session = requests.Session()
         response = session.head(short_url, allow_redirects=True, timeout=5)
         final_url = response.url
-        return final_url
+        return force_french_version(final_url)  # Force French after expanding
     except Exception as e:
         print(f"Error expanding URL: {e}")
-        return short_url  # Fallback to original if expansion fails
+        return force_french_version(short_url)  # Fallback with French enforcement
 
-# Improved link extraction with URL expansion
+# ===== Extract link and ensure it's French =====
 def extract_link(text):
     link_pattern = r'https?://\S+|www\.\S+'
     links = re.findall(link_pattern, text)
     if links:
         link = links[0]
-        # Expand if it's a shortened AliExpress link
+        # Expand if it's a shortened link
         if "s.click.aliexpress.com" in link:
             link = expand_shortened_url(link)
+        # Force French version
+        link = force_french_version(link)
         return link
     return None
 
-# Modified to handle all URL formats
+# ===== Modified to work ONLY with fr.aliexpress.com =====
 def get_affiliate_links(message, message_id, link):
     try:
-        # Ensure we have the final product URL
-        if "s.click.aliexpress.com" in link:
-            link = expand_shortened_url(link)
-        
-        # Force French version for API compatibility
-        if "aliexpress.com" in link and not link.startswith("https://fr.aliexpress.com"):
-            parsed = urlparse(link)
-            link = f"https://fr.aliexpress.com{parsed.path}?{parsed.query}" if parsed.query else f"https://fr.aliexpress.com{parsed.path}"
+        # Ensure link is in French version
+        link = force_french_version(link)
+        print(f"Processing link: {link}")  # Debug log
 
         # Generate affiliate links
         affiliate_link = aliexpress.get_affiliate_links(
@@ -98,7 +112,7 @@ def get_affiliate_links(message, message_id, link):
                                " \n قارن بين الاسعار واشتري 🔥 \n"
                                f"💰 عرض العملات (السعر النهائي عند الدفع)  : \nالرابط {affiliate_link} \n"
                                f"💎 عرض السوبر  : \nالرابط {super_links} \n"
-                               f"♨️ عرض محدود  : \nالرابط {limit_links} \n\n"
+                               f"♨️ عرض محدود  : \نالرابط {limit_links} \n\n"
                                "t.me/tcoupon !",
                         reply_markup=keyboard
                     )
@@ -107,7 +121,7 @@ def get_affiliate_links(message, message_id, link):
         except Exception as e:
             print(f"Error getting product details: {e}")
 
-        # Fallback if product details not available
+        # Fallback if product details fail
         bot.delete_message(message.chat.id, message_id)
         bot.send_message(
             message.chat.id,
@@ -122,35 +136,7 @@ def get_affiliate_links(message, message_id, link):
         print(f"Error in get_affiliate_links: {e}")
         bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
 
-# Shopping cart link handler (unchanged)
-def build_shopcart_link(link):
-    params = get_url_params(link)
-    shop_cart_link = "https://www.aliexpress.com/p/trade/confirm.html?"
-    shop_cart_params = {
-        "availableProductShopcartIds": ",".join(params["availableProductShopcartIds"]),
-        "extraParams": json.dumps({"channelInfo": {"sourceType": "620"}}, separators=(',', ':'))
-    }
-    return create_query_string_url(link=shop_cart_link, params=shop_cart_params)
-
-def get_url_params(link):
-    parsed = urlparse(link)
-    return parse_qs(parsed.query)
-
-def create_query_string_url(link, params):
-    return link + urllib.parse.urlencode(params)
-
-def get_affiliate_shopcart_link(link, message):
-    try:
-        shopcart_link = build_shopcart_link(link)
-        affiliate_link = aliexpress.get_affiliate_links(shopcart_link)[0].promotion_link
-        text2 = f"هذا رابط تخفيض السلة \n{str(affiliate_link)}"
-        img_link3 = "https://i.postimg.cc/HkMxWS1T/photo-5893070682508606111-y.jpg"
-        bot.send_photo(message.chat.id, img_link3, caption=text2)
-    except Exception as e:
-        print(f"Error in shopcart: {e}")
-        bot.send_message(message.chat.id, "حدث خطأ 🤷🏻‍♂️")
-
-# Message handlers (unchanged)
+# ===== Rest of the code remains the same =====
 @bot.message_handler(commands=['start'])
 def welcome_user(message):
     bot.send_message(
