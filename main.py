@@ -13,8 +13,7 @@ bot = telebot.TeleBot(bot_token)
 app_key = os.getenv('ALIEXPRESS_APP_KEY')
 app_secret = os.getenv('ALIEXPRESS_APP_SECRET')
 aliexpress = AliexpressApi(app_key, app_secret,
-                           models.Language.EN, models.Currency.EUR, 'default')
-
+                           models.Language.EN, models.Currency.USD, 'default')
 keyboardStart = types.InlineKeyboardMarkup(row_width=1)
 btn1 = types.InlineKeyboardButton("⭐️ألعاب لجمع العملات المعدنية⭐️", callback_data="games")
 btn2 = types.InlineKeyboardButton("⭐️تخفيض العملات على منتجات السلة 🛒⭐️", callback_data='click')
